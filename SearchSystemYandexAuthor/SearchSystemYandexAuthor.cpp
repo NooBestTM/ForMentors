@@ -17,9 +17,20 @@ enum class TaskStatus {
 // Объявляем тип-синоним для map<TaskStatus, int>,
 // позволяющего хранить количество задач каждого статуса
 using TasksInfo = map<TaskStatus, int>;
-
+//using statused_i = static_cast<TaskStatus>(i);
 
 class TeamTasks {
+public:
+    // Получить статистику по статусам задач конкретного разработчика
+    const TasksInfo& GetPersonTasksInfo(const string& person) const {
+        return programmers_tasks_.at(person);
+    }
+
+    // Добавить новую задачу (в статусе NEW) для конкретного разработчика
+    void AddNewTask(const string& person) {
+        ++programmers_tasks_[person][TaskStatus::NEW];
+    }
+
     // Обновить статусы по данному количеству задач конкретного разработчика,
     // подробности см. ниже
     tuple<TasksInfo, TasksInfo> PerformPersonTasks(const string& person, int task_count) {
@@ -61,4 +72,42 @@ private:
             --task_count;
         }
     }
+
 };
+
+// Принимаем словарь по значению, чтобы иметь возможность
+// обращаться к отсутствующим ключам с помощью [] и получать 0,
+// не меняя при этом исходный словарь.
+void PrintTasksInfo(TasksInfo tasks_info) {
+    cout << tasks_info[TaskStatus::NEW] << " new tasks"s
+        << ", "s << tasks_info[TaskStatus::IN_PROGRESS] << " tasks in progress"s
+        << ", "s << tasks_info[TaskStatus::TESTING] << " tasks are being tested"s
+        << ", "s << tasks_info[TaskStatus::DONE] << " tasks are done"s << endl;
+}
+
+int main() {
+    TeamTasks tasks;
+    tasks.AddNewTask("Ilia");
+    for (int i = 0; i < 3; ++i) {
+        tasks.AddNewTask("Ivan");
+    }
+    cout << "Ilia's tasks: ";
+    PrintTasksInfo(tasks.GetPersonTasksInfo("Ilia"));
+    cout << "Ivan's tasks: ";
+    PrintTasksInfo(tasks.GetPersonTasksInfo("Ivan"));
+
+    TasksInfo updated_tasks, untouched_tasks;
+    cout << "task_count = 4" << endl;
+    tie(updated_tasks, untouched_tasks) = tasks.PerformPersonTasks("Ivan", 4);
+    cout << "Updated Ivan's tasks: ";
+    PrintTasksInfo(updated_tasks);
+    cout << "Untouched Ivan's tasks: ";
+    PrintTasksInfo(untouched_tasks);
+
+    cout << "task_count = 6" << endl;
+    tie(updated_tasks, untouched_tasks) = tasks.PerformPersonTasks("Ivan", 6);
+    cout << "Updated Ivan's tasks: ";
+    PrintTasksInfo(updated_tasks);
+    cout << "Untouched Ivan's tasks: ";
+    PrintTasksInfo(untouched_tasks);
+}
