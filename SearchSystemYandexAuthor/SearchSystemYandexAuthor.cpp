@@ -1,186 +1,64 @@
-﻿#include <algorithm>
-#include <iostream>
-#include <set>
+﻿#include <iostream>
+#include <map>
 #include <string>
-#include <utility>
+#include <tuple>
 #include <vector>
-
+#define statused_i static_cast<TaskStatus>(i)
 using namespace std;
 
-const int MAX_RESULT_DOCUMENT_COUNT = 5;
-
-string ReadLine() {
-    string s;
-    getline(cin, s);
-    return s;
-}
-
-int ReadLineWithNumber() {
-    int result = 0;
-    cin >> result;
-    ReadLine();
-    return result;
-}
-
-vector<string> SplitIntoWords(const string& text) {
-    vector<string> words;
-    string word;
-    for (const char c : text) {
-        if (c == ' ') {
-            if (!word.empty()) {
-                words.push_back(word);
-                word.clear();
-            }
-        }
-        else {
-            word += c;
-        }
-    }
-    if (!word.empty()) {
-        words.push_back(word);
-    }
-
-    return words;
-}
-
-struct Document {
-    int id;
-    int relevance;
+// Перечислимый тип для статуса задачи
+enum class TaskStatus {
+    NEW,          // новая
+    IN_PROGRESS,  // в разработке
+    TESTING,      // на тестировании
+    DONE          // завершена
 };
 
-class SearchServer {
-public:
-    void SetStopWords(const string& text) {
-        for (const string& word : SplitIntoWords(text)) {
-            stop_words_.insert(word);
+// Объявляем тип-синоним для map<TaskStatus, int>,
+// позволяющего хранить количество задач каждого статуса
+using TasksInfo = map<TaskStatus, int>;
+
+
+class TeamTasks {
+    // Обновить статусы по данному количеству задач конкретного разработчика,
+    // подробности см. ниже
+    tuple<TasksInfo, TasksInfo> PerformPersonTasks(const string& person, int task_count) {
+        TasksInfo performed_tasks, unperformed_tasks = programmers_tasks_.at(person);
+        TasksInfo start = programmers_tasks_.at(person);
+
+        if (programmers_tasks_.count(person) == 0) {
+            return tuple(performed_tasks, unperformed_tasks);
         }
-    }
 
-    void AddDocument(int document_id, const string& document) {
-        const vector<string> words = SplitIntoWordsNoStop(document);
-        documents_.push_back({ document_id, words });
-    }
-
-    vector<Document> FindTopDocuments(const string& raw_query) const {
-        const Query query = ParseQuery(raw_query);
-        auto matched_documents = FindAllDocuments(query);
-
-        sort(matched_documents.begin(), matched_documents.end(),
-            [](const Document& lhs, const Document& rhs) {
-            return lhs.relevance > rhs.relevance;
-        });
-        if (matched_documents.size() > MAX_RESULT_DOCUMENT_COUNT) {
-            matched_documents.resize(MAX_RESULT_DOCUMENT_COUNT);
+        for (int i = 0; i < 3; ++i) {
+            if (task_count == 0) {
+                break;
+            }
+            PerformTasks(person, task_count, statused_i,
+                performed_tasks, unperformed_tasks);
         }
-        return matched_documents;
+
+        unperformed_tasks.erase(TaskStatus::DONE);
+
+        return tuple(performed_tasks, unperformed_tasks);
     }
 
 private:
-    struct DocumentContent {
-        int id = 0;
-        vector<string> words;
-    };
+    map<string, TasksInfo> programmers_tasks_;
 
-    struct Query {
-        set<string> minus_words;
-        set<string> plus_words;
-    };
+    void PerformTasks(const string& person, int& task_count, TaskStatus task_status,
+        TasksInfo& performed_tasks, TasksInfo& unperformed_tasks) {
+        int next_status = static_cast<int>(task_status) + 1;
+        while (task_count != 0 && programmers_tasks_.at(person)[task_status] != 0) {
+            ++performed_tasks[static_cast<TaskStatus>(next_status)];
+            --programmers_tasks_[person][task_status];
+            ++programmers_tasks_[person][static_cast<TaskStatus>(next_status)];
 
-    struct QueryWord {
-        string data;
-        bool is_minus;
-    };
-
-    vector<DocumentContent> documents_;
-
-    set<string> stop_words_;
-
-    bool IsStopWord(const string& word) const {
-        return stop_words_.count(word) > 0;
-    }
-
-    vector<string> SplitIntoWordsNoStop(const string& text) const {
-        vector<string> words;
-        for (const string& word : SplitIntoWords(text)) {
-            if (!IsStopWord(word)) {
-                words.push_back(word);
+            //если задач в текущем статусе на начало выполнения не было
+            if (unperformed_tasks[task_status] != 0) {
+                --unperformed_tasks[task_status];
             }
+            --task_count;
         }
-        return words;
-    }
-
-    QueryWord ParseQueryWord(string word) const {
-        bool is_minus = false;
-        if (word[0] == '-') {
-            word = word.substr(1);
-            is_minus = true;
-        }
-        return { word, is_minus };
-    }
-
-    Query ParseQuery(const string& text) const {
-        Query query;
-        for (const string& word : SplitIntoWordsNoStop(text)) {
-            QueryWord query_word = ParseQueryWord(word);
-            if (query_word.is_minus) {
-                query.minus_words.insert(query_word.data);
-            }
-            else {
-                query.plus_words.insert(query_word.data);
-            }
-        }
-        return query;
-    }
-
-    vector<Document> FindAllDocuments(const Query& query) const {
-        vector<Document> matched_documents;
-        for (const auto& document : documents_) {
-            const int relevance = MatchDocument(document, query);
-            if (relevance > 0) {
-                matched_documents.push_back({ document.id, relevance });
-            }
-        }
-        return matched_documents;
-    }
-
-    static int MatchDocument(const DocumentContent& content, const Query& query) {
-        if (query.plus_words.empty()) {
-            return 0;
-        }
-        set<string> matched_words;
-        for (const string& word : content.words) {
-            if (query.minus_words.count(word) != 0) {
-                return 0;
-            }
-            if (matched_words.count(word) != 0) {
-                continue;
-            }
-            if (query.plus_words.count(word) != 0) {
-                matched_words.insert(word);
-            }
-        }
-        return static_cast<int>(matched_words.size());
     }
 };
-
-SearchServer CreateSearchServer() {
-    SearchServer search_server;
-    search_server.SetStopWords(ReadLine());
-
-    const int document_count = ReadLineWithNumber();
-    for (int document_id = 0; document_id < document_count; ++document_id) {
-        search_server.AddDocument(document_id, ReadLine());
-    }
-
-    return search_server;
-}
-
-int main() {
-    const SearchServer search_server = CreateSearchServer();
-
-    const string query = ReadLine();
-    for (const auto& [document_id, relevance] : search_server.FindTopDocuments(query)) {
-        cout << "{ document_id = "s << document_id << ", "
-            << "relevance = "s << relevance << " }"s << endl;
-    }
-}
