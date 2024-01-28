@@ -376,8 +376,7 @@ class Paginator {
 public:
     Paginator(const Iterator begin,
         const Iterator end,
-        const size_t page_size) :
-        begin_(begin), end_(end)
+        const size_t page_size)
     {
         for (Iterator step = begin; step < end; ) {
             if (static_cast<size_t>(distance(step, end)) < page_size) {
@@ -390,11 +389,11 @@ public:
         }
     }
 
-    Iterator begin() const {
-        return (*pages_.begin()).begin();
+    auto begin() const {
+        return pages_.begin();
     }
-    Iterator end() const {
-        return (*pages_.rbegin()).end();
+    auto end() const {
+        return pages_.end();
     }
     size_t size() const {
         return pages_.size();
@@ -402,7 +401,6 @@ public:
 
 private:
     vector<IteratorRange<Iterator>> pages_;
-    Iterator begin_, end_;
 };
 
 template<typename Container>
@@ -474,4 +472,4 @@ int main() {
         cout << e.what() << endl;
     }
     return 0;
-}}
+}
