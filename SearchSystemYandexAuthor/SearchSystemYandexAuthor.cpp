@@ -155,7 +155,6 @@ public:
     tuple<vector<string>, DocumentStatus> MatchDocument(const string& raw_query,
         int document_id) const {
         //Добавил исключение, если данного документа не существует
-        //В задании о нём не говорится
         if (documents_.count(document_id) == 0) {
             string except_msg = "There is no document with ID: " + to_string(document_id);
             throw invalid_argument(except_msg);
@@ -342,25 +341,23 @@ template<typename Iterator>
 class IteratorRange {
 public:
     IteratorRange(Iterator begin, Iterator end) :
-        begin_(begin), end_(end),
         page_documents_(vector<Document>(begin, end))
     {}
 
-    Iterator begin() const {
-        return begin_;
+    auto begin() const {
+        return page_documents_.begin();
     }
 
-    Iterator end() const {
-        return end_;
+    auto end() const {
+        return page_documents_.end();
     }
 
     size_t size() const {
-        return distance(begin_, end_);
+        return page_documents_.size();
     }
 
 private:
     vector<Document> page_documents_;
-    Iterator begin_, end_;
 };
 
 template <typename Iterator>
@@ -386,6 +383,9 @@ public:
             Iterator temp = step;
             advance(step, page_size);
             pages_.push_back({ temp, step });
+        }
+        if (pages_.size() == 0) {
+            throw invalid_argument("There are no such coincidences."s);
         }
     }
 
@@ -457,7 +457,9 @@ int main() {
         search_server.AddDocument(3, "big cat nasty hair"s, DocumentStatus::ACTUAL, { 1, 2, 8 });
         search_server.AddDocument(4, "big dog cat Vladislav"s, DocumentStatus::ACTUAL, { 1, 3, 2 });
         search_server.AddDocument(5, "big dog hamster Borya"s, DocumentStatus::ACTUAL, { 1, 1, 1 });
-        const auto search_results = search_server.FindTopDocuments("curly dog"s);
+        //auto search_results = search_server.FindTopDocuments("curly dog"s);
+        //const auto search_results = search_server.FindTopDocuments("gime me some fresh air");
+        const auto search_results = search_server.FindTopDocuments(""s);
         int page_size = 2;
         const auto pages = Paginate(search_results, page_size);
         for (auto page = pages.begin(); page != pages.end(); ++page) {
@@ -466,10 +468,10 @@ int main() {
         }
     }
     catch (const invalid_argument& e) {
-        cout << e.what() << endl;
+        cerr << e.what() << endl;
     }
     catch (const out_of_range& e) {
-        cout << e.what() << endl;
+        cerr << e.what() << endl;
     }
     return 0;
 }
